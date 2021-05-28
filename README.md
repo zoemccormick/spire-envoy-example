@@ -1,6 +1,8 @@
 # spire-envoy-example
 
-For a quickstart - follow this README.
+This repo provides a simple setup of SPIRE for Kubernetes, and two Envoy proxy deployments to communicate to each other using SPIFFE mTLS.
+
+For a quickstart follow this README.
 
 ## Prerequisites
 
