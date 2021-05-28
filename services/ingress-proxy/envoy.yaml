@@ -66,14 +66,18 @@ static_resources:
                 grpc_services:
                   envoy_grpc:
                     cluster_name: spire_agent
-          validation_context_sds_secret_config:
-            name: spiffe://quickstart.spire.io
-            sds_config:
-              api_config_source:
-                api_type: gRPC
-                grpc_services:
-                  envoy_grpc:
-                    cluster_name: spire_agent
+          combined_validation_context:
+            default_validation_context:
+              match_subject_alt_names:
+                exact: spiffe://quickstart.spire.io/helloworld
+            validation_context_sds_secret_config:
+              name: spiffe://quickstart.spire.io
+              sds_config:
+                api_config_source:
+                  api_type: gRPC
+                  grpc_services:
+                    envoy_grpc:
+                      cluster_name: spire_agent
           tls_params:
              ecdh_curves:
               - X25519:P-256:P-521:P-384
