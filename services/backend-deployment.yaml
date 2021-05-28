@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: helloworld
+  labels:
+    app: helloworld
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 10808
+  selector:
+    app: helloworld
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: helloworld
+  labels:
+    app: helloworld
+    spire-discover: helloworld
+spec:
+  selector:
+    matchLabels:
+      app: helloworld
+  template:
+    metadata:
+      labels:
+        app: helloworld
+        spire-discover: helloworld
+    spec:
+      containers:
+      - name: proxy
+        image: zoemccormick/spire-envoy-example:backend
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 10808
+        - name: envoy-admin
+          containerPort: 8001
+        volumeMounts:
+        - name: spire-socket
+          mountPath: /run/spire/socket
+          readOnly: false
+      - name: helloworld
+        image: gcr.io/google-samples/hello-app:1.0
+        imagePullPolicy: IfNotPresent
+        ports:
+          - containerPort: 8080
+      volumes:
+      - name: spire-socket
+        hostPath:
+          path: /run/spire/socket
+          type: DirectoryOrCreate

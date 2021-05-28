@@ -1,0 +1,90 @@
+admin:
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address: { address: 0.0.0.0, port_value: 8001 }
+
+node:
+  id: default
+  cluster: helloworld
+
+static_resources:
+  listeners:
+  - name: ingress
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 10808 }
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          set_current_client_cert_details:
+              uri: true
+          codec_type: AUTO
+          access_log:
+            - name: envoy.file_access_log
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+                path: "/dev/stdout"
+          stat_prefix: ingress
+          route_config:
+            name: local
+            virtual_hosts:
+              - name: local
+                domains: ["*"]
+                routes:
+                  - match:
+                      prefix: "/"
+                    route:
+                      cluster: local
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config: {}
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificate_sds_secret_configs:
+            - name: spiffe://quickstart.spire.io/helloworld
+              sds_config:
+                api_config_source:
+                  api_type: gRPC
+                  grpc_services:
+                    envoy_grpc:
+                      cluster_name: spire_agent
+            validation_context_sds_secret_config:
+              name: spiffe://quickstart.spire.io
+              sds_config:
+                api_config_source:
+                  api_type: gRPC
+                  grpc_services:
+                    envoy_grpc:
+                      cluster_name: spire_agent
+            tls_params:
+               ecdh_curves:
+                - X25519:P-256:P-521:P-384
+  clusters:
+  - name: local
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: local
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 8080
+  - name: spire_agent
+    connect_timeout: 0.25s
+    http2_protocol_options: {}
+    load_assignment:
+      cluster_name: spire_agent
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                pipe:
+                  path: /run/spire/socket/agent.sock

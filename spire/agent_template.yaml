@@ -1,0 +1,188 @@
+---
+# Source: agent/templates/agent-sa.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent
+  namespace: spire
+  labels:
+    chart: "agent-2.2.5"
+    release: "agent"
+    heritage: "Helm"
+---
+# Source: agent/templates/config-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-config
+  namespace: spire
+  labels:
+    chart: "agent-2.2.5"
+    release: "agent"
+    heritage: "Helm"
+data:
+  agent.conf: |-
+    agent {
+      data_dir = "/run/spire"
+      log_level = "info"
+      server_address = "server"
+      server_port = "8443"
+      socket_path = "/run/spire/socket/agent.sock"
+      trust_bundle_path = "/run/spire/bundle/bundle.crt"
+      trust_domain = "quickstart.spire.io"
+      enable_sds = true
+    }
+
+    plugins {
+      NodeAttestor "k8s_psat" {
+        plugin_data {
+          cluster = "quickstart"
+          token_path = "/run/spire/token/agent"
+        }
+      }
+
+      KeyManager "memory" {
+        plugin_data {
+        }
+      }
+
+      WorkloadAttestor "k8s" {
+        plugin_data {
+          skip_kubelet_verification = true
+        }
+      }
+
+      WorkloadAttestor "unix" {
+          plugin_data {
+          }
+      }
+    }
+---
+# Source: agent/templates/agent-clusterrole.yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: spire.agent
+  labels:
+    chart: "agent-2.2.5"
+    release: "agent"
+    heritage: "Helm"
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - "pods"
+      - "nodes"
+      - "nodes/proxy"
+    verbs:
+      - "get"
+---
+# Source: agent/templates/agent-clusterrolebinding.yaml
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: spire.agent
+  labels:
+    chart: "agent-2.2.5"
+    release: "agent"
+    heritage: "Helm"
+subjects:
+  - kind: ServiceAccount
+    name: agent
+    namespace: spire
+roleRef:
+  kind: ClusterRole
+  name: spire.agent
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: agent/templates/daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: agent
+  namespace: spire
+  labels:
+    chart: "agent-2.2.5"
+    release: "agent"
+    heritage: "Helm"
+    app: agent
+    cluster: spire.agent
+spec:
+  selector:
+    matchLabels:
+      app: agent
+      spire-discover: agent
+      cluster: spire.agent
+  template:
+    metadata:
+      namespace: spire
+      labels:
+        spire-discover: agent
+        app: agent
+        cluster: spire.agent
+    spec:
+      hostPID: true
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      serviceAccountName: agent
+      initContainers:
+        - name: init-server
+          image: gcr.io/spiffe-io/wait-for-it
+          args:
+            - "-t"
+            - "30"
+            - "server:8443"
+        - name: init-registrar
+          image: gcr.io/spiffe-io/wait-for-it
+          args:
+            - "-t"
+            - "30"
+            - "registrar:8444"
+      containers:
+        - name: agent
+          image: gcr.io/spiffe-io/spire-agent:0.12.0
+          args:
+            - "-config"
+            - "/run/spire/config/agent.conf"
+          volumeMounts:
+            - name: agent-config
+              mountPath: /run/spire/config
+              readOnly: true
+            - name: agent-socket
+              mountPath: /run/spire/socket
+              readOnly: false
+            - name: server-bundle
+              mountPath: /run/spire/bundle
+              readOnly: true
+            - name: agent-token
+              mountPath: /run/spire/token
+              readOnly: false
+          livenessProbe:
+            exec:
+              command:
+                - /opt/spire/bin/spire-agent
+                - healthcheck
+                - -socketPath
+                - /run/spire/socket/agent.sock
+            failureThreshold: 2
+            initialDelaySeconds: 15
+            periodSeconds: 60
+            timeoutSeconds: 3
+      volumes:
+        - name: agent-config
+          configMap:
+            name: agent-config
+        - name: agent-socket
+          hostPath:
+            path: /run/spire/socket
+            type: DirectoryOrCreate
+        - name: server-bundle
+          configMap:
+            name: server-bundle
+        - name: agent-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: agent
+                  expirationSeconds: 7200
+                  audience: server

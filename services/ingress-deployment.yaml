@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-proxy
+  labels:
+    app: ingress-proxy
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 10808
+  selector:
+    app: ingress-proxy
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-proxy
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: http
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+spec:
+  rules:
+    - http:
+        paths:
+        - backend:
+            serviceName: ingress-proxy
+            servicePort: 10808
+          path: /
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingress-proxy
+  labels:
+    app: ingress-proxy
+    spire-discover: ingress-proxy
+spec:
+  selector:
+    matchLabels:
+      app: ingress-proxy
+  template:
+    metadata:
+      labels:
+        app: ingress-proxy
+        spire-discover: ingress-proxy
+    spec:
+      containers:
+      - name: ingress-proxy
+        image: zoemccormick/spire-envoy-example:ingress
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 10808
+        - name: envoy-admin
+          containerPort: 8001
+        volumeMounts:
+        - name: spire-socket
+          mountPath: /run/spire/socket
+          readOnly: false
+      volumes:
+      - name: spire-socket
+        hostPath:
+          path: /run/spire/socket
+          type: DirectoryOrCreate
