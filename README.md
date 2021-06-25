@@ -27,7 +27,7 @@ kubectl apply -f spire/agent_template.yaml
 2. Install the envoy ingress proxy and envoy backend service deployments. The images are for the `Dockerfile`'s found in `/services` are already generated and tagged at `zoemccormick/spire-envoy-example:ingress` and `zoemccormick/spire-envoy-example:backend`, respectively.
 
 ```bash
-kubectl apply -f services/ingress-deployment.yaml
+kubectl apply -f services/edge-deployment.yaml
 kubectl apply -f services/backend-deployment.yaml
 ```
 
@@ -36,5 +36,5 @@ kubectl apply -f services/backend-deployment.yaml
 If you want to update the envoy configurations and try new images, make the changes and build with:
 
 ```bash
-docker build -f services/ingress-proxy/Dockerfile .
+docker build -f services/edge-proxy/Dockerfile .
 ```

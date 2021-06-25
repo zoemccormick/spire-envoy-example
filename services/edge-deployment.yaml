@@ -1,21 +1,21 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: ingress-proxy
+  name: edge-proxy
   labels:
-    app: ingress-proxy
+    app: edge-proxy
 spec:
   type: LoadBalancer
   ports:
   - name: http
     port: 10808
   selector:
-    app: ingress-proxy
+    app: edge-proxy
 ---
 apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
-  name: ingress-proxy
+  name: edge-proxy
   namespace: default
   annotations:
     nginx.ingress.kubernetes.io/backend-protocol: http
@@ -26,29 +26,29 @@ spec:
     - http:
         paths:
         - backend:
-            serviceName: ingress-proxy
+            serviceName: edge-proxy
             servicePort: 10808
           path: /
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ingress-proxy
+  name: edge-proxy
   labels:
-    app: ingress-proxy
-    spire-discover: ingress-proxy
+    app: edge-proxy
+    spire-discover: edge-proxy
 spec:
   selector:
     matchLabels:
-      app: ingress-proxy
+      app: edge-proxy
   template:
     metadata:
       labels:
-        app: ingress-proxy
-        spire-discover: ingress-proxy
+        app: edge-proxy
+        spire-discover: edge-proxy
     spec:
       containers:
-      - name: ingress-proxy
+      - name: edge-proxy
         image: zoemccormick/spire-envoy-example:ingress
         imagePullPolicy: Always
         ports:

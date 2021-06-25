@@ -55,7 +55,7 @@ static_resources:
             combined_validation_context:
               default_validation_context:
                 match_subject_alt_names:
-                  exact: spiffe://quickstart.spire.io/ingress-proxy
+                  exact: spiffe://quickstart.spire.io/edge-proxy
               validation_context_sds_secret_config:
                 name: spiffe://quickstart.spire.io
                 sds_config:
